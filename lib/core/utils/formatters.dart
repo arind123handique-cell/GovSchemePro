@@ -17,10 +17,14 @@ class Formatters {
   );
 
   static final NumberFormat _qty = NumberFormat('#,##0.###', 'en_IN');
+  static final NumberFormat _currencyPlain = NumberFormat('#,##,##0.00', 'en_IN');
   static final DateFormat _date = DateFormat('dd-MM-yyyy');
   static final DateFormat _dateTime = DateFormat('dd-MM-yyyy hh:mm a');
 
   static String currency(num? value) => _currency.format(value ?? 0);
+
+  /// Number-only currency format (no ₹ symbol) — for use with "Rs." prefix in PDFs.
+  static String currency2(num? value) => _currencyPlain.format(value ?? 0);
 
   static String compactCurrency(num? value) => _compact.format(value ?? 0);
 

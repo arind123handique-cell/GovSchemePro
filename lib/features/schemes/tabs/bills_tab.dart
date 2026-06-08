@@ -74,6 +74,9 @@ class BillsTab extends ConsumerWidget {
                         case 'form25':
                           await _form25(context, ref, b);
                           break;
+                        case 'export':
+                          await _form25(context, ref, b, export: true);
+                          break;
                         case 'delete':
                           final bool ok = await UiHelpers.confirm(context,
                               title: 'Delete bill',
@@ -90,6 +93,8 @@ class BillsTab extends ConsumerWidget {
                     itemBuilder: (_) => const <PopupMenuEntry<String>>[
                       PopupMenuItem<String>(
                           value: 'form25', child: Text('Form 25 PDF')),
+                      PopupMenuItem<String>(
+                          value: 'export', child: Text('Export PDF')),
                       PopupMenuItem<String>(value: 'edit', child: Text('Edit')),
                       PopupMenuItem<String>(
                           value: 'delete', child: Text('Delete')),
@@ -111,7 +116,8 @@ class BillsTab extends ConsumerWidget {
     ));
   }
 
-  Future<void> _form25(BuildContext context, WidgetRef ref, Bill bill) async {
+  Future<void> _form25(BuildContext context, WidgetRef ref, Bill bill,
+      {bool export = false}) async {
     final Scheme? scheme =
         await ref.read(schemeRepositoryProvider).getById(schemeId);
     if (scheme == null) return;
@@ -127,7 +133,12 @@ class BillsTab extends ConsumerWidget {
       items: items,
       contractor: contractor,
     );
-    await PdfService.preview(bytes, 'Form25_${bill.billNumber ?? bill.id}');
+    final String name = 'Form25_${bill.billNumber ?? bill.id}';
+    if (export) {
+      await PdfService.share(bytes, '$name.pdf');
+    } else {
+      await PdfService.preview(bytes, name);
+    }
   }
 }
 
