@@ -267,7 +267,17 @@ class PdfService {
           padding: const pw.EdgeInsets.symmetric(vertical: 1),
           child: pw.Row(children: <pw.Widget>[
             pw.Expanded(child: pw.Text(label, style: s)),
-            pw.SizedBox(width: 120, child: pw.Text(amount, style: s, textAlign: pw.TextAlign.right)),
+            // Amount aligned under the "Amount Upto Date" column (where the
+            // TOTAL (i) figure sits) rather than the far-right page edge.
+            pw.SizedBox(
+              width: 120,
+              child: pw.Padding(
+                padding: const pw.EdgeInsets.only(right: 3),
+                child: pw.Text(amount, style: s, textAlign: pw.TextAlign.right),
+              ),
+            ),
+            // Spacer = width of the "Since previous" (78) + "Remarks" (50) cols.
+            pw.SizedBox(width: 128),
           ]),
         );
       }
