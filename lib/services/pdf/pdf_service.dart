@@ -22,7 +22,7 @@ class PdfService {
   String get _officer => settings['officer_name'] ?? '';
   String get _designation => settings['officer_designation'] ?? '';
 
-  /// Assam Running Account Bill — Form 25.
+  /// Assam Running Account Bill — Form 25 (Assam Schedule III Sec II).
   Future<Uint8List> form25({
     required Scheme scheme,
     required Bill bill,
@@ -31,93 +31,299 @@ class PdfService {
   }) async {
     final pw.Document doc = pw.Document(theme: await PdfTheme.theme());
 
-    final List<List<String>> rows = <List<String>>[];
-    for (int i = 0; i < items.length; i++) {
-      final BillItem item = items[i];
-      rows.add(<String>[
-        item.itemNo ?? '${i + 1}',
-        item.description ?? '',
-        item.unit ?? '',
-        Formatters.quantity(item.quantity),
-        Formatters.quantity(item.rate),
-        Formatters.quantity(item.amount),
+    const PdfColor blue = PdfColor.fromInt(0xFF0000CC);
+    const double fs = 8.0;
+    const double fsSmall = 7.0;
+    const double fsMed = 8.5;
+    const double fsLarge = 10.0;
+    final pw.TextStyle baseStyle =
+        pw.TextStyle(fontSize: fs, color: blue);
+    final pw.TextStyle boldStyle =
+        pw.TextStyle(fontSize: fs, fontWeight: pw.FontWeight.bold, color: blue);
+    final pw.TextStyle boldLarge =
+        pw.TextStyle(fontSize: fsLarge, fontWeight: pw.FontWeight.bold, color: blue);
+
+    final String contractorName = contractor?.name ?? '-';
+    final String contractorAddr = contractor?.address ?? '';
+    final bool isFirstBill = bill.previousAmount == 0;
+    final double totalUptoDate = bill.grossAmount;
+    final double totalSincePrev =
+        isFirstBill ? totalUptoDate : (totalUptoDate - bill.previousAmount);
+
+    // --- Page 1 header (printed only once via MultiPage firstPageHeader) ---
+    pw.Widget firstPageHeader(pw.Context ctx) {
+      pw.Widget lv(String label, String value) => pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(vertical: 0.5),
+            child: pw.Row(children: <pw.Widget>[
+              pw.SizedBox(
+                  width: 140,
+                  child: pw.Text(label, style: boldStyle)),
+              pw.Text(': ', style: baseStyle),
+              pw.Expanded(child: pw.Text(value, style: baseStyle)),
+            ]),
+          );
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: <pw.Widget>[
+          pw.Center(
+            child: pw.Column(children: <pw.Widget>[
+              pw.Text('Assam Schedule III Sec II Form No. 25',
+                  style: pw.TextStyle(fontSize: fsSmall, color: blue)),
+              pw.SizedBox(height: 1),
+              pw.Text('F.R. Form No. 29',
+                  style: pw.TextStyle(fontSize: fsSmall, color: blue)),
+              pw.SizedBox(height: 4),
+              pw.Text(
+                  '[Final payment must invariably be made on Forms No. 25(A) Schedule (III - II)]',
+                  style: pw.TextStyle(fontSize: fsSmall, color: blue)),
+              pw.SizedBox(height: 2),
+              pw.Text('RUNNING ACCOUNT BILL (C)', style: boldLarge),
+              pw.Text('(See Final Rule 506)',
+                  style: pw.TextStyle(fontSize: fsSmall, color: blue)),
+              pw.SizedBox(height: 1),
+              pw.Text(
+                  '(For Contractors and Suppliers \u2013 This form provides only for payment for works or suppliers actual measured)',
+                  style: pw.TextStyle(fontSize: fsSmall, color: blue),
+                  textAlign: pw.TextAlign.center),
+            ]),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: <pw.Widget>[
+              pw.Text('Cash Book Voucher No: _______________', style: baseStyle),
+              pw.Text('Date: _______________', style: baseStyle),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          lv('Name of Work', scheme.schemeName),
+          lv('Name of Contractor',
+              contractorAddr.isEmpty
+                  ? contractorName
+                  : '$contractorName, $contractorAddr'),
+          lv('Purpose of Supply {}', ''),
+          lv('Serial No. of Bill',
+              '${bill.billType ?? "RA Bill"}   dated   ${Formatters.date(bill.billDate)}'),
+          lv('No. & date of last Bill', ''),
+          lv('Reference to Agreement',
+              'F.W.O. No: ${scheme.workOrderNumber ?? "-"}'
+              '${scheme.workOrderDate != null ? "  dtd. ${Formatters.date(scheme.workOrderDate)}" : ""}'),
+          lv('Tender No', scheme.tenderNumber ?? '-'),
+          lv('Date of commencement', Formatters.date(scheme.startDate)),
+          lv('Date of completion',
+              scheme.status == 'Completed'
+                  ? 'Completed'
+                  : Formatters.date(scheme.targetCompletionDate)),
+          pw.SizedBox(height: 4),
+          pw.Center(
+            child: pw.Text('1. Account of work done for suppliers made.',
+                style: boldStyle),
+          ),
+          pw.SizedBox(height: 3),
+        ],
+      );
+    }
+
+    // --- Reusable table header row ---
+    pw.TableRow tableHeaderRow() {
+      pw.Widget hc(String text, {pw.TextAlign align = pw.TextAlign.center}) =>
+          pw.Padding(
+            padding: const pw.EdgeInsets.all(2),
+            child: pw.Text(text,
+                style: pw.TextStyle(
+                    fontSize: fsSmall, fontWeight: pw.FontWeight.bold, color: blue),
+                textAlign: align),
+          );
+      return pw.TableRow(children: <pw.Widget>[
+        hc('Unit'),
+        hc('Quantity\nexecuted\nfor Supplied\nupto date\nas per\nmeasureme\nnt Book'),
+        hc('Name of Work or Suppliers (grouped under Sub\n- heads and Sub- works of estimate'),
+        hc('Rate'),
+        hc('Amount\n\nUpto Date'),
+        hc('Since- previous bill\nTotal for ( each Sub\nhead )'),
+        hc('Remarks'),
       ]);
     }
 
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        header: (pw.Context ctx) => PdfTheme.header(
-          department: _department,
-          office: _office,
-          title: 'RUNNING ACCOUNT BILL — FORM 25',
-          subtitle: bill.billType ?? 'RA Bill',
-        ),
-        footer: PdfTheme.footer,
-        build: (pw.Context ctx) => <pw.Widget>[
-          pw.SizedBox(height: 8),
-          _twoColumnMeta(<List<String>>[
-            <String>['Scheme', scheme.schemeName],
-            <String>['Scheme ID', scheme.id],
-            <String>['Contractor', contractor?.name ?? '-'],
-            <String>['Agreement / WO No.', scheme.workOrderNumber ?? '-'],
-            <String>['AA No.', scheme.aaNumber ?? '-'],
-            <String>['TS No.', scheme.tsNumber ?? '-'],
-            <String>['Bill No.', bill.billNumber ?? '-'],
-            <String>['Bill Date', Formatters.date(bill.billDate)],
-          ]),
-          pw.SizedBox(height: 10),
-          pw.Text('I. Account of Work Executed',
-              style: pw.TextStyle(
-                  fontSize: 11, fontWeight: pw.FontWeight.bold)),
-          pw.SizedBox(height: 4),
-          pw.TableHelper.fromTextArray(
-            headers: <String>[
-              'Item',
-              'Description',
-              'Unit',
-              'Qty (upto date)',
-              'Rate',
-              'Amount upto date',
-            ],
-            data: rows,
-            headerStyle: pw.TextStyle(
-                fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.white),
-            headerDecoration:
-                const pw.BoxDecoration(color: PdfTheme.primary),
-            cellStyle: const pw.TextStyle(fontSize: 8.5),
-            cellAlignments: <int, pw.Alignment>{
-              0: pw.Alignment.centerLeft,
-              1: pw.Alignment.centerLeft,
-              2: pw.Alignment.center,
-              3: pw.Alignment.centerRight,
-              4: pw.Alignment.centerRight,
-              5: pw.Alignment.centerRight,
-            },
-            columnWidths: <int, pw.TableColumnWidth>{
-              0: const pw.FixedColumnWidth(34),
-              1: const pw.FlexColumnWidth(3),
-              2: const pw.FixedColumnWidth(34),
-              3: const pw.FixedColumnWidth(64),
-              4: const pw.FixedColumnWidth(54),
-              5: const pw.FixedColumnWidth(74),
-            },
-            border: pw.TableBorder.all(color: PdfTheme.border, width: 0.5),
-          ),
-          pw.SizedBox(height: 12),
-          _abstract(bill),
-          pw.SizedBox(height: 6),
-          pw.Container(
-            padding: const pw.EdgeInsets.all(6),
-            decoration: const pw.BoxDecoration(color: PdfTheme.secondary),
-            child: pw.Text(
-              'Net Amount Payable: ${Formatters.amountInWords(bill.netPayable)}',
-              style: pw.TextStyle(
-                  fontSize: 10, fontStyle: pw.FontStyle.italic),
+    pw.TableRow colNumberRow() {
+      pw.Widget cn(String text) => pw.Padding(
+            padding: const pw.EdgeInsets.all(2),
+            child: pw.Text(text,
+                style: boldStyle, textAlign: pw.TextAlign.center),
+          );
+      return pw.TableRow(children: <pw.Widget>[
+        cn('1'),
+        cn('2.00'),
+        cn('3'),
+        cn('4'),
+        cn('5'),
+        cn('6'),
+        cn('7'),
+      ]);
+    }
+
+    pw.TableRow subHeaderRow() {
+      pw.Widget sh(String text) => pw.Padding(
+            padding: const pw.EdgeInsets.all(2),
+            child: pw.Text(text,
+                style: boldStyle, textAlign: pw.TextAlign.center),
+          );
+      return pw.TableRow(children: <pw.Widget>[
+        pw.SizedBox(),
+        pw.SizedBox(),
+        pw.Row(children: <pw.Widget>[
+          pw.SizedBox(width: 20, child: sh('SL')),
+          pw.SizedBox(width: 24, child: sh('BOQ')),
+          pw.Expanded(child: sh('Description')),
+        ]),
+        pw.SizedBox(),
+        pw.SizedBox(),
+        pw.SizedBox(),
+        pw.SizedBox(),
+      ]);
+    }
+
+    // --- Data rows ---
+    List<pw.TableRow> dataRows() {
+      final List<pw.TableRow> rows = <pw.TableRow>[];
+      for (int i = 0; i < items.length; i++) {
+        final BillItem item = items[i];
+        final double sincePrev = isFirstBill ? item.amount : 0;
+        pw.Widget c(String text, {pw.TextAlign align = pw.TextAlign.left}) =>
+            pw.Padding(
+              padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+              child: pw.Text(text, style: baseStyle, textAlign: align),
+            );
+
+        rows.add(pw.TableRow(children: <pw.Widget>[
+          c(item.unit ?? '', align: pw.TextAlign.center),
+          c(Formatters.quantity(item.quantity), align: pw.TextAlign.right),
+          // Column 3: SL + BOQ + Description combined
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+            child: pw.Row(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: <pw.Widget>[
+                pw.SizedBox(
+                    width: 20,
+                    child: pw.Text('${i + 1}', style: baseStyle,
+                        textAlign: pw.TextAlign.center)),
+                pw.SizedBox(
+                    width: 24,
+                    child: pw.Text(item.itemNo ?? '${i + 1}', style: baseStyle,
+                        textAlign: pw.TextAlign.center)),
+                pw.Expanded(
+                  child: pw.Text(item.description ?? '', style: baseStyle),
+                ),
+              ],
             ),
           ),
+          c('Rs. ${Formatters.currency2(item.rate)}', align: pw.TextAlign.right),
+          c('Rs. ${Formatters.currency2(item.amount)}', align: pw.TextAlign.right),
+          c('Rs. ${Formatters.currency2(sincePrev)}', align: pw.TextAlign.right),
+          c('', align: pw.TextAlign.left),
+        ]));
+      }
+      return rows;
+    }
+
+    // --- Total row ---
+    pw.TableRow totalRow(String label, double uptoDate, double sincePrev) {
+      pw.Widget c(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.right}) =>
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+            child: pw.Text(text,
+                style: bold ? boldStyle : baseStyle, textAlign: align),
+          );
+      return pw.TableRow(children: <pw.Widget>[
+        pw.SizedBox(),
+        pw.SizedBox(),
+        c(label, bold: true, align: pw.TextAlign.right),
+        pw.SizedBox(),
+        c('Rs. ${Formatters.currency2(uptoDate)}', bold: true),
+        c('Rs. ${Formatters.currency2(sincePrev)}', bold: true),
+        pw.SizedBox(),
+      ]);
+    }
+
+    final Map<int, pw.TableColumnWidth> colWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FixedColumnWidth(30),  // Unit
+      1: const pw.FixedColumnWidth(45),  // Quantity
+      2: const pw.FlexColumnWidth(3),    // SL/BOQ/Description
+      3: const pw.FixedColumnWidth(58),  // Rate
+      4: const pw.FixedColumnWidth(78),  // Amount Upto Date
+      5: const pw.FixedColumnWidth(78),  // Since previous
+      6: const pw.FixedColumnWidth(50),  // Remarks
+    };
+    final pw.TableBorder tBorder =
+        pw.TableBorder.all(color: blue, width: 0.5);
+
+    // --- Summary section ---
+    pw.Widget summarySection() {
+      pw.Widget summaryRow(String label, String amount, {bool bold = false}) {
+        final pw.TextStyle s = bold ? boldStyle : baseStyle;
+        return pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(vertical: 1),
+          child: pw.Row(children: <pw.Widget>[
+            pw.Expanded(child: pw.Text(label, style: s)),
+            pw.SizedBox(width: 120, child: pw.Text(amount, style: s, textAlign: pw.TextAlign.right)),
+          ]),
+        );
+      }
+
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: <pw.Widget>[
+          summaryRow(
+            'Total value of work done or supplied made to date ........................... (A)',
+            'Rs. ${Formatters.currency2(totalUptoDate)}',
+            bold: true,
+          ),
+          summaryRow(
+            'Deduct the value of work or supplies shown on previous bil no......',
+            'Rs. ${Formatters.currency2(bill.previousAmount)}',
+          ),
+          summaryRow(
+            'Net value of work or supplies since previous bill .........................(B)',
+            'Rs. ${Formatters.currency2(totalSincePrev)}',
+            bold: true,
+          ),
           pw.SizedBox(height: 4),
+          pw.Center(
+            child: pw.Text(
+              '(${Formatters.amountInWords(totalSincePrev)})',
+              style: pw.TextStyle(fontSize: fsMed, color: blue),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // --- Section II: Certificate and Signatures ---
+    pw.Widget certificateSection() {
+      return pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: <pw.Widget>[
+          pw.SizedBox(height: 6),
+          pw.Center(
+            child: pw.Text('II . Certificate and Signatures',
+                style: boldStyle),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Text(
+            'The measurements were made by me and are record at page No ___ to ___ '
+            'of Measurement Book No. ________ (Abstract) and page No ___ to ___ '
+            'of Measurement Book No. ________ respectively',
+            style: baseStyle,
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'No advance payment has been made previously without detailed measurements.',
+            style: baseStyle,
+          ),
+          pw.SizedBox(height: 14),
+          // Signature block 1: Thumb impression + Officer preparing
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.end,
@@ -125,16 +331,112 @@ class PdfService {
               pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: <pw.Widget>[
-                  pw.SizedBox(height: 40),
-                  pw.Container(
-                      width: 160, child: pw.Divider(color: PdfTheme.border)),
-                  pw.Text("Contractor's Signature",
-                      style: const pw.TextStyle(fontSize: 9)),
+                  pw.Text('Thumb impression', style: pw.TextStyle(
+                      fontSize: fs, fontStyle: pw.FontStyle.italic, color: blue)),
                 ],
               ),
-              PdfTheme.signatureBlock(_officer, _designation),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: <pw.Widget>[
+                  pw.Container(width: 160, child: pw.Divider(color: blue)),
+                  pw.Text('Dated Signature of Officer', style: baseStyle),
+                  pw.Text('preparing the bill', style: baseStyle),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: <pw.Widget>[
+                  pw.Text('(Rank )', style: baseStyle),
+                  pw.Text('..................sub-division', style: baseStyle),
+                  pw.Text('..................division', style: baseStyle),
+                ],
+              ),
             ],
           ),
+          pw.SizedBox(height: 8),
+          // Signature block 2: Contractor
+          pw.Text('Dated Signature of', style: pw.TextStyle(
+              fontSize: fs, fontStyle: pw.FontStyle.italic, color: blue)),
+          pw.Text('   Contractor', style: pw.TextStyle(
+              fontSize: fs, fontStyle: pw.FontStyle.italic, color: blue)),
+          pw.SizedBox(height: 10),
+          // Signature block 3: Officer authorizing payment
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: <pw.Widget>[
+              pw.SizedBox(width: 100),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: <pw.Widget>[
+                  pw.Container(width: 160, child: pw.Divider(color: blue)),
+                  pw.Text('Dated Signature of Officer', style: baseStyle),
+                  pw.Text('authorizing Payment', style: baseStyle),
+                ],
+              ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: <pw.Widget>[
+                  pw.Text('(Rank)', style: baseStyle),
+                  pw.Text('....................sub-division', style: baseStyle),
+                  pw.Text('.................... division', style: baseStyle),
+                ],
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'The signature is necessary only when the officer preparing the bill for the officer who '
+            'authorises the payment in such a case dated signature are essential.',
+            style: pw.TextStyle(fontSize: 6, color: blue),
+          ),
+        ],
+      );
+    }
+
+    // Build the document. The metadata header is part of the flowing content
+    // (page 1 only); the table flows across pages and gets a repeated column
+    // header on every continuation page via the MultiPage `header` callback.
+    doc.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        header: (pw.Context ctx) {
+          if (ctx.pageNumber == 1) return pw.SizedBox();
+          // Continuation pages: repeat the table column header.
+          return pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 2),
+            child: pw.Table(
+              border: tBorder,
+              columnWidths: colWidths,
+              children: <pw.TableRow>[tableHeaderRow(), colNumberRow()],
+            ),
+          );
+        },
+        footer: (pw.Context ctx) => pw.Container(
+          alignment: pw.Alignment.center,
+          margin: const pw.EdgeInsets.only(top: 4),
+          child: pw.Text('[${ctx.pageNumber}]',
+              style: pw.TextStyle(fontSize: 7, color: blue)),
+        ),
+        build: (pw.Context ctx) => <pw.Widget>[
+          firstPageHeader(ctx),
+          // Single table: it carries its own header rows at the top and flows
+          // across pages.
+          pw.Table(
+            border: tBorder,
+            columnWidths: colWidths,
+            children: <pw.TableRow>[
+              tableHeaderRow(),
+              colNumberRow(),
+              subHeaderRow(),
+              ...dataRows(),
+              totalRow('TOTAL  (i) =', totalUptoDate, totalSincePrev),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          summarySection(),
+          certificateSection(),
         ],
       ),
     );
@@ -156,49 +458,6 @@ class PdfService {
         pw.Expanded(child: col(left)),
         pw.SizedBox(width: 16),
         pw.Expanded(child: col(right)),
-      ],
-    );
-  }
-
-  pw.Widget _abstract(Bill bill) {
-    pw.TableRow row(String label, num value, {bool bold = false}) {
-      return pw.TableRow(children: <pw.Widget>[
-        pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: pw.Text(label,
-              style: pw.TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-        ),
-        pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-          child: pw.Text(Formatters.currency(value),
-              textAlign: pw.TextAlign.right,
-              style: pw.TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-        ),
-      ]);
-    }
-
-    return pw.Table(
-      border: pw.TableBorder.all(color: PdfTheme.border, width: 0.5),
-      columnWidths: <int, pw.TableColumnWidth>{
-        0: const pw.FlexColumnWidth(3),
-        1: const pw.FlexColumnWidth(1),
-      },
-      children: <pw.TableRow>[
-        row('Gross value of work done (A)', bill.grossAmount, bold: true),
-        row('Less: Amount of previous bill', bill.previousAmount),
-        row('Net value of this bill (B)', bill.netAmount, bold: true),
-        row('Less: Security Deposit', bill.securityDeposit),
-        row('Less: GST', bill.gst),
-        row('Less: Labour Cess', bill.labourCess),
-        row('Less: Income Tax', bill.incomeTax),
-        row('Less: Royalty', bill.royalty),
-        row('Less: Other Recoveries', bill.otherRecoveries),
-        row('Total Deductions', bill.totalDeductions, bold: true),
-        row('Net Amount Payable', bill.netPayable, bold: true),
       ],
     );
   }
