@@ -29,7 +29,7 @@ class PdfService {
     required List<BillItem> items,
     Contractor? contractor,
   }) async {
-    final pw.Document doc = pw.Document();
+    final pw.Document doc = pw.Document(theme: await PdfTheme.theme());
 
     final List<List<String>> rows = <List<String>>[];
     for (int i = 0; i < items.length; i++) {
@@ -208,7 +208,7 @@ class PdfService {
     required Scheme scheme,
     required Certificate certificate,
   }) async {
-    final pw.Document doc = pw.Document();
+    final pw.Document doc = pw.Document(theme: await PdfTheme.theme());
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -254,7 +254,7 @@ class PdfService {
     String? subtitle,
     bool landscape = true,
   }) async {
-    final pw.Document doc = pw.Document();
+    final pw.Document doc = pw.Document(theme: await PdfTheme.theme());
     doc.addPage(
       pw.MultiPage(
         pageFormat:
@@ -303,7 +303,7 @@ class PdfService {
     required double physical,
     required double financial,
   }) async {
-    final pw.Document doc = pw.Document();
+    final pw.Document doc = pw.Document(theme: await PdfTheme.theme());
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,

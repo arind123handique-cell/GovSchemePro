@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -8,6 +9,25 @@ class PdfTheme {
   static const PdfColor primary = PdfColor.fromInt(0xFF0F4C81);
   static const PdfColor secondary = PdfColor.fromInt(0xFFEAF3FA);
   static const PdfColor border = PdfColor.fromInt(0xFFBBBBBB);
+
+  static pw.ThemeData? _theme;
+
+  /// Bundled Roboto theme (includes the rupee glyph) so documents render the
+  /// currency symbol offline instead of falling back to a font without it.
+  static Future<pw.ThemeData> theme() async {
+    if (_theme != null) return _theme!;
+    final pw.Font base =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Regular.ttf'));
+    final pw.Font bold =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Bold.ttf'));
+    final pw.Font italic =
+        pw.Font.ttf(await rootBundle.load('assets/fonts/Roboto-Italic.ttf'));
+    return _theme = pw.ThemeData.withFont(
+      base: base,
+      bold: bold,
+      italic: italic,
+    );
+  }
 
   static pw.Widget header({
     required String department,
