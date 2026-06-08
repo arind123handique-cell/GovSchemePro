@@ -259,45 +259,56 @@ class PdfService {
     final pw.TableBorder tBorder =
         pw.TableBorder.all(color: blue, width: 0.5);
 
-    // --- Summary section ---
+    // --- Summary section (bordered cells aligned with the main table grid) ---
+    // The label cell spans columns 1-4 of the form; the amount sits in a box
+    // under "Amount Upto Date" with the "Since previous"/"Remarks" cells kept
+    // as empty boxes so the grid continues seamlessly from the TOTAL (i) row.
+    final Map<int, pw.TableColumnWidth> summaryWidths =
+        <int, pw.TableColumnWidth>{
+      0: const pw.FlexColumnWidth(), // label (= Unit+Quantity+Description+Rate)
+      1: const pw.FixedColumnWidth(78), // Amount Upto Date
+      2: const pw.FixedColumnWidth(78), // Since previous
+      3: const pw.FixedColumnWidth(50), // Remarks
+    };
     pw.Widget summarySection() {
-      pw.Widget summaryRow(String label, String amount, {bool bold = false}) {
+      pw.TableRow summaryRow(String label, String amount, {bool bold = false}) {
         final pw.TextStyle s = bold ? boldStyle : baseStyle;
-        return pw.Padding(
-          padding: const pw.EdgeInsets.symmetric(vertical: 1),
-          child: pw.Row(children: <pw.Widget>[
-            pw.Expanded(child: pw.Text(label, style: s)),
-            // Amount aligned under the "Amount Upto Date" column (where the
-            // TOTAL (i) figure sits) rather than the far-right page edge.
-            pw.SizedBox(
-              width: 120,
-              child: pw.Padding(
-                padding: const pw.EdgeInsets.only(right: 3),
-                child: pw.Text(amount, style: s, textAlign: pw.TextAlign.right),
-              ),
-            ),
-            // Spacer = width of the "Since previous" (78) + "Remarks" (50) cols.
-            pw.SizedBox(width: 128),
-          ]),
-        );
+        return pw.TableRow(children: <pw.Widget>[
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: pw.Text(label, style: s),
+          ),
+          pw.Padding(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+            child: pw.Text(amount, style: s, textAlign: pw.TextAlign.right),
+          ),
+          pw.SizedBox(),
+          pw.SizedBox(),
+        ]);
       }
 
       return pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: <pw.Widget>[
-          summaryRow(
-            'Total value of work done or supplied made to date ........................... (A)',
-            'Rs. ${Formatters.currency2(totalUptoDate)}',
-            bold: true,
-          ),
-          summaryRow(
-            'Deduct the value of work or supplies shown on previous bil no......',
-            'Rs. ${Formatters.currency2(bill.previousAmount)}',
-          ),
-          summaryRow(
-            'Net value of work or supplies since previous bill .........................(B)',
-            'Rs. ${Formatters.currency2(totalSincePrev)}',
-            bold: true,
+          pw.Table(
+            border: tBorder,
+            columnWidths: summaryWidths,
+            children: <pw.TableRow>[
+              summaryRow(
+                'Total value of work done or supplied made to date ........................... (A)',
+                'Rs. ${Formatters.currency2(totalUptoDate)}',
+                bold: true,
+              ),
+              summaryRow(
+                'Deduct the value of work or supplies shown on previous bil no......',
+                'Rs. ${Formatters.currency2(bill.previousAmount)}',
+              ),
+              summaryRow(
+                'Net value of work or supplies since previous bill .........................(B)',
+                'Rs. ${Formatters.currency2(totalSincePrev)}',
+                bold: true,
+              ),
+            ],
           ),
           pw.SizedBox(height: 4),
           pw.Center(
@@ -332,7 +343,7 @@ class PdfService {
             'No advance payment has been made previously without detailed measurements.',
             style: baseStyle,
           ),
-          pw.SizedBox(height: 14),
+          pw.SizedBox(height: 10),
           // Signature block 1: Thumb impression + Officer preparing
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -369,7 +380,7 @@ class PdfService {
               fontSize: fs, fontStyle: pw.FontStyle.italic, color: blue)),
           pw.Text('   Contractor', style: pw.TextStyle(
               fontSize: fs, fontStyle: pw.FontStyle.italic, color: blue)),
-          pw.SizedBox(height: 10),
+          pw.SizedBox(height: 8),
           // Signature block 3: Officer authorizing payment
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -444,7 +455,6 @@ class PdfService {
               totalRow('TOTAL  (i) =', totalUptoDate, totalSincePrev),
             ],
           ),
-          pw.SizedBox(height: 4),
           summarySection(),
           certificateSection(),
         ],
